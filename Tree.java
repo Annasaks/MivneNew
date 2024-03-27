@@ -1,18 +1,14 @@
 
 public class Tree {
-    private Node root;
-    private Node min ;
+     Node root;
+     Node min ;
 
 
-    public Tree(int degree) {
+    public Tree() {
         this.root =null;
 
         this.min=null;
 
-        this.degree = degree;
-    }
-
-    private void initTree() {
         Node x = new Node(Integer.MAX_VALUE); // Internal node with key +∞
         Node l = new Node(Integer.MIN_VALUE); // Leaf node with key -∞
         Node m = new Node(Integer.MAX_VALUE); // Leaf node with key +∞
@@ -24,16 +20,32 @@ public class Tree {
 
         // The right child is not used in the initial configuration
         x.right = null;
-
+        x.parent=null;
         // Setting the root of the tree
         this.root = x;
+
+        this.min = l;
+
     }
 
+
+
     public void displayTree() {
-        if (root != null) {
-            System.out.println("Root Key: " + root.key);
-            System.out.println("Left Child Key: " + root.left.key);
-            System.out.println("Middle Child Key: " + root.middle.key);
+        displaySubTree(root, "", true);
+    }
+
+    private void displaySubTree(Node node, String prefix, boolean isTail) {
+        if (node != null) {
+            System.out.println(prefix + (isTail ? "└── " : "├── ") + node.key );
+            // Plusieurs enfants nécessitent une logique pour gérer correctement l'affichage
+            int nonNullChildren = 0;
+            if (node.left != null) nonNullChildren++;
+            if (node.middle != null) nonNullChildren++;
+            if (node.right != null) nonNullChildren++;
+
+            if (nonNullChildren > 0) displaySubTree(node.left, prefix + (isTail ? "    " : "│   "), nonNullChildren == 1);
+            if (nonNullChildren > 1) displaySubTree(node.middle, prefix + (isTail ? "    " : "│   "), nonNullChildren == 2);
+            if (nonNullChildren > 2) displaySubTree(node.right, prefix + (isTail ? "    " : "│   "), true);
         }
     }
 
@@ -44,14 +56,14 @@ public class Tree {
         return search(root, key);
     }
 
-    private Node search(Node x, int key) {
+    public Node search(Node x, int key) {
         if (x == null) {
             return null; // Retourne null si x est null pour gérer les appels sur des nœuds inexistants
         }
 
         // Si x est une feuille, vérifier la clé
         if (x.isLeaf()) {
-            if (x.key.equals(key)) {
+            if (x.key==key) {
                 return x; // Clé trouvée
             } else {
                 return null; // Clé non trouvée
@@ -69,7 +81,7 @@ public class Tree {
     }
 
     public Node findMinimum() {
-        if (root == null || root.key.equals(Integer.MAX_VALUE)) {
+        if (root == null ) {
             throw new IllegalStateException("T is empty");
         }
 
@@ -77,52 +89,35 @@ public class Tree {
         while (!x.isLeaf()) {
             x = x.left; // Toujours aller à gauche pour trouver le minimum
         }
+        x = x.parent.middle;
 
-        if (!x.key.equals(Integer.MAX_VALUE)) {
+        if (x.key!=Integer.MAX_VALUE) {
             return x;
         } else {
             throw new IllegalStateException("T is empty");
         }
     }
 
-
-
-    public Node findSuccessor(Node x) {
-        if (x == null) {
-            return null; // Retourne null si x est null
+    public Node treeMinimum(Node node) {
+        while (node.left != null) {
+            node = node.left;
         }
+        return node.parent.middle;
+    }
 
-        Node z = x.parent;
-        // Monter dans l'arbre tant que nous sommes sur le chemin "droit" ou le seul chemin "moyen"
-        while (z != null && (x == z.right || (z.right == null && x == z.middle))) {
-            x = z;
-            z = z.parent;
-        }
 
-        // Si nous avons atteint la racine sans trouver un nœud interne approprié, il n'y a pas de successeur
-        if (z == null) {
-            return null;
-        }
 
-        // Déterminer le chemin vers le successeur
-        Node y;
-        if (x == z.left) {
-            y = z.middle != null ? z.middle : z.right; // Prendre le milieu si possible, sinon le droit
-        } else {
-            y = z.right;
+    public Node treeSuccessor(Node x) {
+        if (x.right != null) {
+            return treeMinimum(x.right);
         }
-
-        // Descendre à la feuille la plus à gauche dans le sous-arbre sélectionné
-        while (y != null && !y.isLeaf()) {
-            y = y.left;
+        Node y = x.parent;
+        Node z =x;
+        while (y != null && z == y.right) {
+            z = y;
+            y = y.parent;
         }
-
-        // Vérifier que le successeur a une clé valide
-        if (y != null && y.key < Integer.MAX_VALUE) {
-            return y;
-        } else {
-            return null; // Aucun successeur valide trouvé
-        }
+        return y;
     }
 
 
@@ -141,6 +136,13 @@ public class Tree {
         if (x.right != null) {
             x.key = x.right.key;
         }
+
+        //if (x.middle== null && x.right!=null){
+          //  x.middle=x.right;
+          //  delete(x.right);
+        //}
+
+
 
 
     }
@@ -189,7 +191,7 @@ public class Tree {
         }
 
         // Création d'un nouveau nœud interne y pour la scission
-        Node y = new Node(null); // La clé sera mise à jour par setChildren
+        Node y = new Node(); // La clé sera mise à jour par setChildren
 
         if (z.key < l.key) {
             setChildren(x, z, l, null);
@@ -237,21 +239,48 @@ public class Tree {
 
         // À ce point, y est le parent où z doit être inséré
         Node x = y.parent;
+        updateSizeInsert(y);
         Node split = insertAndSplit(x, z);
+
+        updateSizeInsert(y);
+
 
         // Réorganiser l'arbre en remontant, si nécessaire
         while (x != root && split != null) {
             x = x.parent;
+            updateSizeInsert(x);
             split = insertAndSplit(x, split);
         }
 
         // Si un split est retourné à la racine, créer un nouveau nœud w comme racine
         if (split != null) {
-            Node w = new Node(null); // Créer un nouveau nœud interne w
+            Node w = new Node(); // Créer un nouveau nœud interne w
             setChildren(w, root, split, null);
             root = w; // Mettre à jour la racine de l'arbre
         }
+
+        this.min = findMinimum();
     }
+
+    public void updateSizeInsert(Node x ){
+        Node y =x;
+        while(y!=null) {
+            y.size++;
+            y=y.parent;
+
+        }
+    }
+
+    public void updateSizeDelete(Node x ){
+        Node y =x.parent;
+        while(y!=null) {
+            y.size--;
+            y=y.parent;
+
+        }
+    }
+
+
 
 
     public Node borrowOrMerge(Node y) {
@@ -265,7 +294,7 @@ public class Tree {
                 setChildren(x, x.middle, x.right, null);
             } else { // Fusionner x et y
                 setChildren(x, y.left, x.left, x.middle);
-                delete(y); // Supprimez y de l'arbre
+                //delete(y); // Supprimez y de l'arbre
                 setChildren(z, x, z.right, null);
             }
         } else if (y == z.middle) { // y est l'enfant du milieu de z
@@ -275,7 +304,7 @@ public class Tree {
                 setChildren(x, x.left, x.middle, null);
             } else { // Fusionner x et y
                 setChildren(x, x.left, x.middle, y.left);
-                delete(y); // Supprimez y de l'arbre
+                //delete(y); // Supprimez y de l'arbre
                 setChildren(z, x, z.right, null);
             }
         } else { // y est l'enfant de droite de z
@@ -285,7 +314,7 @@ public class Tree {
                 setChildren(x, x.left, x.middle, null);
             } else { // Fusionner x et y
                 setChildren(x, x.left, x.middle, y.left);
-                delete(y); // Supprimez y de l'arbre
+                //delete(y); // Supprimez y de l'arbre
                 setChildren(z, z.left, x, null);
             }
         }
@@ -295,34 +324,57 @@ public class Tree {
 
 
 
-    private void delete(Node node) {
-        if (node == null || node.parent == null) {
-            // Le nœud est null ou est la racine sans parent (cas spécial)
-            return;
+    public void delete(Node node) {
+        Node x = search(node.key);
+        updateSizeDelete(x);
+
+
+        if (x == null) {
+            return; // La clé n'existe pas dans l'arbre
         }
 
-        Node parent = node.parent;
+        Node y = x.parent;
+
 
         // Détecter la position de node par rapport à son parent et ajuster les liens en conséquence
-        if (parent.left == node) {
-            parent.left = null; // node est l'enfant gauche
-        } else if (parent.middle == node) {
-            parent.middle = null; // node est l'enfant du milieu
-        } else if (parent.right == node) {
-            parent.right = null; // node est l'enfant droit
+        if (x == y.left) {
+            setChildren(y, y.middle, y.right, null);
+        } else if (x == y.middle) {
+            setChildren(y, y.left, y.right, null);
+        } else { // x est y.right
+            setChildren(y, y.left, y.middle, null);
         }
 
-        // Après avoir retiré node, vérifier si parent doit emprunter un enfant ou fusionner
-        if ((parent.left == null && parent.middle == null) || (parent.middle == null && parent.right == null)) {
-            // Si le parent a maintenant moins de deux enfants, il pourrait avoir besoin d'emprunter ou de fusionner
-            borrowOrMerge(parent);
-        } else {
-            // Sinon, simplement mettre à jour la clé du parent si nécessaire
-            updateKey(parent);
-        }
+        x.left = x.middle = x.right = x.parent = null;
+
+        while (y != null) {
+            if (y.middle != null) {
+
+                // Pas nécessaire si l'arbre suit déjà les règles après la suppression
+                updateKey(y);
+                y = y.parent;
+            }
+            else {
+
+                if (y != root) {
+                    y = borrowOrMerge(y);
+                }
+                else {
+                    root = y.left != null ? y.left : y.right;
+                    if (root != null) {
+                        root.parent = null;
+                    }
+                    this.min = findMinimum();
+                    break;
+                }
+
+                this.min = findMinimum();
     }
 
+            this.min = findMinimum();
+        }
 
-
+    }
 }
+
 
